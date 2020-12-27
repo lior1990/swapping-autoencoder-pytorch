@@ -12,6 +12,8 @@ import torch.distributed as dist
 from torchvision import transforms, utils
 from tqdm import tqdm
 
+from dataset import ImageDataset
+
 try:
     import wandb
 
@@ -19,7 +21,6 @@ except ImportError:
     wandb = None
 
 from model import Encoder, Generator, Discriminator, CooccurDiscriminator
-from stylegan2.dataset import MultiResolutionDataset
 from stylegan2.distributed import (
     get_rank,
     synchronize,
@@ -332,15 +333,13 @@ def train(
 
 
 if __name__ == "__main__":
-    device = "cuda"
-
     torch.backends.cudnn.benchmark = True
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("path", type=str, nargs="+")
+    parser.add_argument("--path", type=str)
     parser.add_argument("--iter", type=int, default=800000)
-    parser.add_argument("--batch", type=int, default=16)
+    parser.add_argument("--batch", type=int, default=2)
     parser.add_argument("--size", type=int, default=256)
     parser.add_argument("--r1", type=float, default=10)
     parser.add_argument("--cooccur_r1", type=float, default=1)
@@ -355,6 +354,9 @@ if __name__ == "__main__":
     parser.add_argument("--local_rank", type=int, default=0)
 
     args = parser.parse_args()
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    args.device = device
 
     n_gpu = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else 1
     args.distributed = n_gpu > 1
@@ -450,20 +452,17 @@ if __name__ == "__main__":
 
     transform = transforms.Compose(
         [
+            transforms.ToPILImage(),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5), inplace=True),
         ]
     )
 
-    datasets = []
-
-    for path in args.path:
-        dataset = MultiResolutionDataset(path, transform, args.size)
-        datasets.append(dataset)
+    dataset = ImageDataset(args.path, transform)
 
     loader = data.DataLoader(
-        data.ConcatDataset(datasets),
+        dataset,
         batch_size=args.batch,
         sampler=data_sampler(dataset, shuffle=True, distributed=args.distributed),
         drop_last=True,
