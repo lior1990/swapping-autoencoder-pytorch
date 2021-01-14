@@ -29,6 +29,8 @@ from stylegan2.distributed import (
     get_world_size,
 )
 
+CHECKPOINT_DIRECTORY = "checkpoint"
+
 
 def data_sampler(dataset, shuffle, distributed):
     if distributed:
@@ -315,7 +317,7 @@ def train(
                         range=(-1, 1),
                     )
 
-            if i % 10000 == 0:
+            if i % args.checkpoint_freq == 0:
                 torch.save(
                     {
                         "e": e_module.state_dict(),
@@ -328,8 +330,14 @@ def train(
                         "d_optim": d_optim.state_dict(),
                         "args": args,
                     },
-                    f"checkpoint/{str(i).zfill(6)}.pt",
+                    os.path.join(CHECKPOINT_DIRECTORY, f"{str(i).zfill(6)}.pt"),
                 )
+                checkpoints = os.listdir(CHECKPOINT_DIRECTORY)
+                if len(checkpoints) > 1:
+                    # remove all checkpoints beside the last one
+                    for checkpoint in sorted(checkpoints)[:-1]:
+                        print(f"Going to delete checkpoint: {checkpoint}")
+                        os.remove(os.path.join(CHECKPOINT_DIRECTORY, checkpoint))
 
 
 if __name__ == "__main__":
@@ -352,6 +360,7 @@ if __name__ == "__main__":
     parser.add_argument("--channel_multiplier", type=int, default=1)
     parser.add_argument("--wandb", action="store_true")
     parser.add_argument("--local_rank", type=int, default=0)
+    parser.add_argument("--checkpoint_freq", type=int, default=10000)
 
     args = parser.parse_args()
 
