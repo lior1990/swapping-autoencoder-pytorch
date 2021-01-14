@@ -204,7 +204,7 @@ def train(
 
         d_regularize = i % args.d_reg_every == 0
 
-        if d_regularize:
+        if d_regularize or args.start_iter == i:
             real_img.requires_grad = True
             real_pred = discriminator(real_img)
             r1_loss = d_r1_loss(real_pred, real_img)
@@ -296,7 +296,7 @@ def train(
                     step=i,
                 )
 
-            if i % 100 == 0:
+            if i % args.samples_freq == 0:
                 with torch.no_grad():
                     e_ema.eval()
                     g_ema.eval()
@@ -361,6 +361,7 @@ if __name__ == "__main__":
     parser.add_argument("--wandb", action="store_true")
     parser.add_argument("--local_rank", type=int, default=0)
     parser.add_argument("--checkpoint_freq", type=int, default=10000)
+    parser.add_argument("--samples_freq", type=int, default=10000)
 
     args = parser.parse_args()
 
